@@ -1,0 +1,54 @@
+# Python – Bytecode & Laufzeit-Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Build-Artefakte
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Tests, Coverage & Tool-Caches
+.pytest_cache/
+.ruff_cache/
+.ty_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.cache/
+hypothesis/
+
+# uv / Virtualenv
+.venv/
+venv/
+env/
+
+# Umgebungsvariablen (nur Vorlagen committen)
+.env
+.env.*
+!.env.example
+
+# Container / Docker / podman – Daten-Volumes
+postgres-data/
+pgadmin-data/
+
+# Logs & PID-Dateien
+*.log
+*.pid
+
+# IDE & Editoren
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Betriebssysteme
+.DS_Store
+Thumbs.db
