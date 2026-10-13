@@ -38,6 +38,9 @@ env/
 postgres-data/
 pgadmin-data/
 
+# Lokale Agent-Konfiguration (bleibt lokal, nicht committen)
+AGENTS.md
+
 # Logs & PID-Dateien
 *.log
 *.pid
