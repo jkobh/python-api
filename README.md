@@ -10,25 +10,36 @@ erDiagram
     MASCHINE ||--|{ KAFFEEBOHNE : "führt"
 
     STANDORT {
-        int id PK
+        uuid id PK
         string name
         string ort
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at "NULL = aktiv"
     }
     MASCHINE {
-        int id PK
+        uuid id PK
         string modell
-        int standort_id FK
+        uuid standort_id FK
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at "NULL = aktiv"
     }
     KAFFEEBOHNE {
-        int id PK
+        uuid id PK
         string sorte
-        int röstgrad
-        int maschine_id FK
+        uuid maschine_id FK
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at "NULL = aktiv"
     }
 ```
 
 - **Standort ↔ Maschine (1:1)** – jeder Standort hat genau eine Kaffeemaschine
 - **Maschine → Kaffeebohnen (1:N)** – eine Maschine führt mehrere Bohnensorten
+- **ID** – alle Primärschlüssel als `uuid` (in der Anwendung generiert)
+- **CRUD-Audit** – jede Entität besitzt `created_at` und `updated_at`
+- **Soft Delete** – `deleted_at = NULL` bedeutet aktiv; gesetzt wird der Datensatz bei GET/List ausgeblendet, bleibt aber in der DB erhalten. **Hard Delete** entfernt den Datensatz dauerhaft.
 
 ## Voraussetzungen
 
