@@ -13,6 +13,7 @@ erDiagram
         uuid id PK
         string name
         string ort
+        int version
         timestamp created_at
         timestamp updated_at
         timestamp deleted_at "NULL = aktiv"
@@ -21,6 +22,7 @@ erDiagram
         uuid id PK
         string modell
         uuid standort_id FK
+        int version
         timestamp created_at
         timestamp updated_at
         timestamp deleted_at "NULL = aktiv"
@@ -29,6 +31,7 @@ erDiagram
         uuid id PK
         string sorte
         uuid maschine_id FK
+        int version
         timestamp created_at
         timestamp updated_at
         timestamp deleted_at "NULL = aktiv"
@@ -37,13 +40,40 @@ erDiagram
 
 - **Standort ↔ Maschine (1:1)** – jeder Standort hat genau eine Kaffeemaschine
 - **Maschine → Kaffeebohnen (1:N)** – eine Maschine führt mehrere Bohnensorten
-- **ID** – alle Primärschlüssel als `uuid` (in der Anwendung generiert)
+- **ID** – alle Primärschlüssel als `uuid` (in der Anwendung als `uuid7` erzeugt, dadurch zeitsortierbar)
 - **CRUD-Audit** – jede Entität besitzt `created_at` und `updated_at`
 - **Soft Delete** – `deleted_at = NULL` bedeutet aktiv; gesetzt wird der Datensatz bei GET/List ausgeblendet, bleibt aber in der DB erhalten. **Hard Delete** entfernt den Datensatz dauerhaft.
 
+### Optimistic Locking
+
+Jeder Datensatz trägt eine `version`. Ein `PUT` muss die zuletzt gelesene `version` mitschicken; die Änderung wird nur ausgeführt, wenn sie noch aktuell ist (`WHERE id = … AND version = …`). Sonst antwortet die API mit `409 Conflict` und der Hinweis, den Datensatz neu zu laden – so gehen parallele Änderungen nicht verloren.
+
+### Löschkaskade
+
+Ein Soft Delete eines Standorts setzt `deleted_at` für die zugehörige Maschine und deren Kaffeebohnen im selben Schritt mit demselben Zeitstempel.
+
+## Endpunkte
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| `GET` | `/standorte` | Standorte auflisten (Query: `name`, `ort`) |
+| `POST` | `/standorte` | Standort anlegen |
+| `GET` | `/standorte/{standort_id}` | Standort lesen (inkl. aktiver Maschine) |
+| `PUT` | `/standorte/{standort_id}` | Standort ändern (`version` erforderlich) |
+| `DELETE` | `/standorte/{standort_id}` | Standort löschen (Kaskade; `hard=true` für endgültig) |
+| `GET` | `/standorte/{standort_id}/maschine` | Maschine des Standorts lesen |
+| `POST` | `/standorte/{standort_id}/maschine` | Maschine anlegen |
+| `PUT` | `/standorte/{standort_id}/maschine` | Maschine ändern (`version` erforderlich) |
+| `DELETE` | `/standorte/{standort_id}/maschine` | Maschine soft löschen (Kaskade auf Bohnen) |
+| `GET` | `/maschinen/{maschine_id}/kaffeebohnen` | Bohnen auflisten (Query: `sorte`) |
+| `POST` | `/maschinen/{maschine_id}/kaffeebohnen` | Kaffeebohne anlegen |
+| `GET` | `/maschinen/{maschine_id}/kaffeebohnen/{kaffeebohne_id}` | Kaffeebohne lesen |
+| `PUT` | `/maschinen/{maschine_id}/kaffeebohnen/{kaffeebohne_id}` | Kaffeebohne ändern (`version` erforderlich) |
+| `DELETE` | `/maschinen/{maschine_id}/kaffeebohnen/{kaffeebohne_id}` | Kaffeebohne soft löschen |
+
 ## Voraussetzungen
 
-- Python ≥ 3.14
+- Python ≥ 3.15
 - [uv](https://docs.astral.sh/uv/) (Projekt- und Dependency-Management)
 - Docker bzw. Docker-kompatible CLI (hier: Podman mit `docker`-Emulation) für PostgreSQL + pgAdmin
 
@@ -127,3 +157,12 @@ Weitere Ziele (z. B. `db-psql`, `db-logs`, `format`) stehen im [Makefile](./Make
 - **Ruff** – Linter & Formatter (Konfiguration in `pyproject.toml`)
 - **ty** – Type-Checker von Astral (Beta; alle Regeln als Fehler)
 - **pytest** – Integrationstests (GET & POST gemäß Checkliste)
+
+## Tests
+
+Die Integrationstests laufen gegen eine eigene Datenbank `coffee_machine_test`. Sie wird von der Fixture in `tests/conftest.py` automatisch angelegt; die Tabellen werden vor jedem Test geleert. Abweichender Zugang lässt sich über `TEST_DATABASE_URL` setzen:
+
+```bash
+uv run pytest          # gesamte Suite
+make check             # lint + typecheck + test
+```
