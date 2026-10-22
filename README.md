@@ -80,10 +80,9 @@ Ein Soft Delete eines Standorts setzt `deleted_at` für die zugehörige Maschine
 ## Schnellstart
 
 ```bash
-uv sync --dev     # Abhängigkeiten installieren (venv + Lockfile)
-make up           # PostgreSQL + pgAdmin starten, Schema anlegen, dann check (Format, Lint, ty, pytest)
-make data         # Demo-Daten in die Live-Datenbank schreiben
-make run          # API-Server mit Hot-Reload starten
+make up    # Abhängigkeiten, Container, Schema, Qualitätsgate – danach läuft die API
+make data  # Demo-Daten in die Live-Datenbank schreiben
+make logs  # Requests und Fehler der API verfolgen (Strg+C beendet nur das Mitlesen)
 ```
 
 Zum Herunterfahren aller Systeme:
@@ -123,21 +122,24 @@ export DATABASE_URL="postgresql+psycopg://coffee:coffee@localhost:5432/coffee_ma
 
 ## Entwicklung
 
-Das Projekt nutzt **GNU Make** als Werkzeug-Menü – alle Befehle zeigt `make help`. Jeder Befehl fasst
-zusammengehörige Schritte zusammen:
+Das Projekt nutzt **GNU Make** als Werkzeug-Menü. Es gibt bewusst nur sechs Befehle, die jeweils mehrere
+zusammengehörige Schritte bündeln:
 
 | Befehl | Zweck |
 |---|---|
-| `make setup` | Abhängigkeiten installieren und Compose-Datei prüfen |
-| `make up` | Container starten, auf PostgreSQL warten, Qualitätsgate ausführen |
-| `make run` | Datenbank sicherstellen und API-Server mit Hot-Reload starten |
+| `make up` | `uv sync`, Compose-Prüfung, Container starten, PostgreSQL abwarten, Schema anlegen, `check` ausführen, API im Hintergrund starten |
+| `make down` | API und Container stoppen (Daten bleiben erhalten) |
 | `make logs` | Requests und Fehler der laufenden API verfolgen |
+| `make check` | Code formatieren, Lint-Fehler korrigieren, Typen prüfen, Tests ausführen |
 | `make data` | Demo-Daten in die Live-Datenbank schreiben (ergänzt nur Fehlendes) |
-| `make check` | Format, Lint, Typecheck und Tests prüfen (ändert nichts) |
-| `make fix` | Code formatieren und behebbare Lint-Fehler korrigieren |
-| `make down` | Container stoppen (Daten bleiben erhalten) |
-| `make reset` | Container und Volumes verwerfen, danach frisch starten |
-| `make help` | Übersicht der Befehle |
+| `make reset` | API stoppen, Volumes verwerfen, danach komplett neu aufbauen |
+
+`make check` **ändert** Dateien: es formatiert (`ruff format`) und korrigiert behebbare Lint-Fehler
+(`ruff check --fix`). Ein reiner Prüflauf ohne Schreibzugriff ist damit nicht mehr Teil des Menüs.
+
+`make up` startet den API-Server mit Hot-Reload **im Hintergrund** – das Terminal bleibt frei. Die PID liegt in
+`logs/api.pid`, die Ausgabe in `logs/api.log`. `make down` beendet ihn wieder. Läuft bereits eine API, meldet ein
+weiteres `make up` nur „API läuft bereits.“ statt einen zweiten Prozess zu starten.
 
 `make data` schreibt einen festen Katalog aus `scripts/seed.py` in die Live-Datenbank `coffee_machine`:
 5 Standorte mit je einer Maschine und 3–5 Kaffeebohnen. Der Befehl ist **idempotent** – er ergänzt nur, was
