@@ -11,7 +11,7 @@ RELEVANT_LOG_LINES := '"(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS) |ERROR|CRITICAL
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up run logs check fix down reset _wait-db _init-schema
+.PHONY: help setup up run logs data check fix down reset _wait-db _init-schema
 
 help: ## Übersicht der verfügbaren Befehle
 	@echo "Verfügbare Befehle:"
@@ -40,6 +40,11 @@ logs: ## Requests und Fehler der laufenden API verfolgen
 	@touch $(LOG_FILE)
 	@echo "Beobachte $(LOG_FILE) – Abbruch mit Strg+C"
 	@tail -f -n +1 $(LOG_FILE) | grep --line-buffered -E $(RELEVANT_LOG_LINES)
+
+data: ## Demo-Daten in die Live-Datenbank schreiben (ergänzt nur Fehlendes)
+	@$(MAKE) --no-print-directory _wait-db
+	@$(MAKE) --no-print-directory _init-schema
+	$(UV) run python -m scripts.seed
 
 check: ## Format, Lint, Typecheck und Tests prüfen (ändert nichts)
 	$(UV) run ruff format --check .

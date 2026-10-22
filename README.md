@@ -81,7 +81,8 @@ Ein Soft Delete eines Standorts setzt `deleted_at` für die zugehörige Maschine
 
 ```bash
 uv sync --dev     # Abhängigkeiten installieren (venv + Lockfile)
-make up           # PostgreSQL + pgAdmin starten, auf Bereitschaft warten, dann check (lint, ty, pytest)
+make up           # PostgreSQL + pgAdmin starten, Schema anlegen, dann check (Format, Lint, ty, pytest)
+make data         # Demo-Daten in die Live-Datenbank schreiben
 make run          # API-Server mit Hot-Reload starten
 ```
 
@@ -131,11 +132,17 @@ zusammengehörige Schritte zusammen:
 | `make up` | Container starten, auf PostgreSQL warten, Qualitätsgate ausführen |
 | `make run` | Datenbank sicherstellen und API-Server mit Hot-Reload starten |
 | `make logs` | Requests und Fehler der laufenden API verfolgen |
+| `make data` | Demo-Daten in die Live-Datenbank schreiben (ergänzt nur Fehlendes) |
 | `make check` | Format, Lint, Typecheck und Tests prüfen (ändert nichts) |
 | `make fix` | Code formatieren und behebbare Lint-Fehler korrigieren |
 | `make down` | Container stoppen (Daten bleiben erhalten) |
 | `make reset` | Container und Volumes verwerfen, danach frisch starten |
 | `make help` | Übersicht der Befehle |
+
+`make data` schreibt einen festen Katalog aus `scripts/seed.py` in die Live-Datenbank `coffee_machine`:
+5 Standorte mit je einer Maschine und 3–5 Kaffeebohnen. Der Befehl ist **idempotent** – er ergänzt nur, was
+fehlt, und lässt vorhandene Datensätze unberührt. Ein zweiter Aufruf meldet entsprechend
+„Keine Änderungen“. Der Katalog wird nicht zufällig erzeugt, damit die Daten reproduzierbar bleiben.
 
 ## Checkliste
 
