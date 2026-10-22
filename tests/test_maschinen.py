@@ -15,9 +15,7 @@ class TestMaschineCreate:
     def test_zweite_maschine_am_standort_ist_409(self, client: TestClient) -> None:
         standort = create_standort(client)
         create_maschine(client, standort["id"])
-        response = client.post(
-            f"/standorte/{standort['id']}/maschine", json={"modell": "Zweite"}
-        )
+        response = client.post(f"/standorte/{standort['id']}/maschine", json={"modell": "Zweite"})
         assert response.status_code == 409
 
     def test_unbekannter_standort_ist_404(self, client: TestClient) -> None:

@@ -14,9 +14,7 @@ class TestKaffeebohneCreate:
         assert kaffeebohne["maschine_id"] == maschine["id"]
 
     def test_unbekannte_maschine_ist_404(self, client: TestClient) -> None:
-        response = client.post(
-            f"/maschinen/{uuid.uuid4()}/kaffeebohnen", json={"sorte": "Arabica"}
-        )
+        response = client.post(f"/maschinen/{uuid.uuid4()}/kaffeebohnen", json={"sorte": "Arabica"})
         assert response.status_code == 404
 
 
@@ -64,9 +62,7 @@ class TestKaffeebohneDelete:
         standort = create_standort(client)
         maschine = create_maschine(client, standort["id"])
         kaffeebohne = create_kaffeebohne(client, maschine["id"])
-        response = client.delete(
-            f"/maschinen/{maschine['id']}/kaffeebohnen/{kaffeebohne['id']}"
-        )
+        response = client.delete(f"/maschinen/{maschine['id']}/kaffeebohnen/{kaffeebohne['id']}")
         assert response.status_code == 204
         verbleibend = client.get(f"/maschinen/{maschine['id']}/kaffeebohnen").json()
         assert verbleibend == []

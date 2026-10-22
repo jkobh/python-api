@@ -1,89 +1,75 @@
 # Makefile für das coffee-machine-api Projekt
 # Zentrale Entwicklungs-Workflows auf Basis von uv, Docker Compose und pytest.
-# Aufruf: make <target>   (alle Targets: make help)
+# Aufruf: make <befehl>   (Übersicht: make help)
 
-UV     := uv
-COMPOSE := docker compose
-APP_MODULE := app.main:app
-LOG_DIR := logs
-LOG_FILE := $(LOG_DIR)/api.log
-PGADMIN_VOLUME := $(shell $(COMPOSE) config --format json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['name'] + '_pgadmin_data')" 2>/dev/null || echo python_pgadmin_data)
+UV            := uv
+COMPOSE       := docker compose
+APP_MODULE    := app.main:app
+LOG_DIR       := logs
+LOG_FILE      := $(LOG_DIR)/api.log
 RELEVANT_LOG_LINES := '"(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS) |ERROR|CRITICAL|Traceback|Uvicorn running|Application startup|WatchFiles'
 
-.PHONY: help setup up down wait-db dev logs db-up db-down db-down-clean db-reset-pgadmin db-logs db-validate db-psql lint format typecheck test check clean
+.DEFAULT_GOAL := help
 
-help: ## Zeigt alle verfügbaren Targets
-	@echo "Verfügbare Targets:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-14s %s\n", $$1, $$2}'
+.PHONY: help setup up run logs check fix down reset _wait-db _init-schema
 
-setup: ## Synchronisiert Abhängigkeiten (uv sync --dev)
+help: ## Übersicht der verfügbaren Befehle
+	@echo "Verfügbare Befehle:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  make %-8s %s\n", $$1, $$2}'
+
+setup: ## Abhängigkeiten installieren und Compose-Datei prüfen
 	$(UV) sync --dev
+	$(COMPOSE) config --quiet
 	@echo "Setup abgeschlossen."
 
-up: ## Startet alle Systeme (PostgreSQL + pgAdmin) und führt die Tests aus
+up: ## Container starten, Schema anlegen, Qualitätsgate ausführen
 	$(COMPOSE) up -d
-	$(MAKE) wait-db
-	$(MAKE) check
+	@$(MAKE) --no-print-directory _wait-db
+	@$(MAKE) --no-print-directory _init-schema
+	@$(MAKE) --no-print-directory check
 
-wait-db: ## Wartet, bis PostgreSQL bereit ist
+run: ## Datenbank sicherstellen und API mit Hot-Reload starten
+	@$(COMPOSE) up -d
+	@$(MAKE) --no-print-directory _wait-db
+	@mkdir -p $(LOG_DIR)
+	@echo "API: http://localhost:8000/docs – Log: $(LOG_FILE) (Strg+C beendet)"
+	$(UV) run uvicorn $(APP_MODULE) --reload 2>&1 | tee $(LOG_FILE)
+
+logs: ## Requests und Fehler der laufenden API verfolgen
+	@mkdir -p $(LOG_DIR)
+	@touch $(LOG_FILE)
+	@echo "Beobachte $(LOG_FILE) – Abbruch mit Strg+C"
+	@tail -f -n +1 $(LOG_FILE) | grep --line-buffered -E $(RELEVANT_LOG_LINES)
+
+check: ## Format, Lint, Typecheck und Tests prüfen (ändert nichts)
+	$(UV) run ruff format --check .
+	$(UV) run ruff check .
+	$(UV) run ty check .
+	$(UV) run pytest -q
+
+fix: ## Code formatieren und behebbare Lint-Fehler korrigieren
+	$(UV) run ruff format .
+	$(UV) run ruff check --fix .
+
+down: ## Container stoppen (Daten in den Volumes bleiben erhalten)
+	$(COMPOSE) down
+	@echo "Container gestoppt, Daten bleiben erhalten."
+
+reset: ## Container und Volumes verwerfen, danach frisch starten
+	$(COMPOSE) down -v
+	@echo "Container und Volumes entfernt – Datenbank und pgAdmin-Konfiguration sind frisch."
+	@$(COMPOSE) up -d
+	@$(MAKE) --no-print-directory _wait-db
+	@$(MAKE) --no-print-directory _init-schema
+
+_wait-db:
 	@echo "Warte auf PostgreSQL ..."
-	@i=0; until $(COMPOSE) exec db pg_isready -U coffee -d coffee_machine >/dev/null 2>&1; do \
+	@i=0; until $(COMPOSE) exec -T db pg_isready -U coffee -d coffee_machine >/dev/null 2>&1; do \
 		i=$$((i+1)); \
-		[ $$i -ge 30 ] && echo "FEHLER: PostgreSQL nicht rechtzeitig erreichbar." && exit 1; \
+		if [ $$i -ge 30 ]; then echo "FEHLER: PostgreSQL nicht rechtzeitig erreichbar."; exit 1; fi; \
 		sleep 2; \
 	done; echo "PostgreSQL ist bereit."
 
-down: ## Fährt alle Systeme ordentlich herunter
-	$(COMPOSE) down
-	@echo "Alle Systeme wurden beendet."
-
-dev: ## Startet den API-Server mit Hot-Reload (uvicorn --reload, Log in logs/api.log)
-	@mkdir -p $(LOG_DIR)
-	$(UV) run uvicorn $(APP_MODULE) --reload 2>&1 | tee $(LOG_FILE)
-
-logs: ## Zeigt Requests, Fehler und Startmeldungen der laufenden API (folgt der Datei)
-	@mkdir -p $(LOG_DIR)
-	@touch $(LOG_FILE)
-	@echo "Beobachte $(LOG_FILE) – Requests und Fehler (Abbruch mit Strg+C)"
-	@tail -f -n +1 $(LOG_FILE) | grep --line-buffered -E $(RELEVANT_LOG_LINES)
-
-db-up: ## Startet PostgreSQL + pgAdmin (Docker Compose)
-	$(COMPOSE) up -d
-
-db-down: ## Stoppt die Datenbank-Container (Daten im Volume bleiben erhalten)
-	$(COMPOSE) down
-
-db-down-clean: ## Stoppt Container und entfernt das Daten-Volume
-	$(COMPOSE) down -v
-
-db-reset-pgadmin: ## Baut nur das pgAdmin-Config-Volume neu auf (DB bleibt erhalten)
-	-$(COMPOSE) rm -sf pgadmin
-	-docker volume rm $(PGADMIN_VOLUME)
-	$(COMPOSE) up -d pgadmin
-
-db-logs: ## Zeigt die Container-Logs
-	$(COMPOSE) logs -f
-
-db-validate: ## Prüft die docker-compose.yml auf Gültigkeit
-	$(COMPOSE) config --quiet
-
-db-psql: ## Öffnet eine psql-Shell im db-Container
-	$(COMPOSE) exec db psql -U coffee -d coffee_machine
-
-lint: ## Führt den Ruff-Linter aus
-	$(UV) run ruff check .
-
-format: ## Formatiert den Code mit Ruff
-	$(UV) run ruff format .
-
-typecheck: ## Führt den Type-Checker ty aus
-	$(UV) run ty check .
-
-test: ## Führt die pytest-Integrationstests aus
-	$(UV) run pytest -q
-
-check: lint typecheck test ## Führt Lint, Typecheck und Tests aus
-
-clean: ## Entfernt Build-, Cache- und Log-Artefakte
-	rm -rf .ruff_cache .pytest_cache .ty_cache .venv $(LOG_DIR)
-	@echo "Aufgeräumt."
+_init-schema:
+	@$(UV) run python -c "from app.database import database; database.create_schema()"
+	@echo "Schema ist angelegt."

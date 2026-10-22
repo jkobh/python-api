@@ -1,39 +1,46 @@
 from collections.abc import Iterator
 
-import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.config import Settings
 from app.database import Base, get_session
 from app.main import create_app
 
-TEST_DATABASE_URL = "postgresql+psycopg://coffee:coffee@localhost:5432/coffee_machine_test"
-TEST_DATABASE_NAME = "coffee_machine_test"
-ADMIN_DATABASE_URL = "postgresql://coffee:coffee@localhost:5432/coffee_machine"
+SETTINGS = Settings.from_environment()
+TEST_DATABASE_NAME: str = make_url(SETTINGS.test_database_url).database or "coffee_machine_test"
 
 
-def ensure_test_database() -> None:
-    with psycopg.connect(ADMIN_DATABASE_URL, autocommit=True) as connection:
-        exists = connection.execute(
-            "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DATABASE_NAME,)
-        ).fetchone()
-        if exists is None:
-            connection.execute(f'CREATE DATABASE "{TEST_DATABASE_NAME}"')
+def create_test_database() -> Engine:
+    admin_engine = create_engine(
+        make_url(SETTINGS.database_url).set(database="postgres"), isolation_level="AUTOCOMMIT"
+    )
+    with admin_engine.connect() as connection:
+        connection.execute(text(f'CREATE DATABASE "{TEST_DATABASE_NAME}"'))
+    return admin_engine
+
+
+def drop_test_database(admin_engine: Engine) -> None:
+    with admin_engine.connect() as connection:
+        connection.execute(text(f'DROP DATABASE IF EXISTS "{TEST_DATABASE_NAME}" WITH (FORCE)'))
+    admin_engine.dispose()
 
 
 @pytest.fixture(scope="session")
 def engine() -> Iterator[Engine]:
     try:
-        ensure_test_database()
-    except psycopg.Error as error:
+        admin_engine = create_test_database()
+    except SQLAlchemyError as error:
         pytest.exit(f"PostgreSQL nicht erreichbar: {error}", returncode=1)
-    test_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    test_engine = create_engine(SETTINGS.test_database_url, pool_pre_ping=True)
     Base.metadata.create_all(test_engine)
     yield test_engine
-    Base.metadata.drop_all(test_engine)
     test_engine.dispose()
+    drop_test_database(admin_engine)
 
 
 @pytest.fixture

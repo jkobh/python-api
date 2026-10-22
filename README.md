@@ -82,7 +82,7 @@ Ein Soft Delete eines Standorts setzt `deleted_at` für die zugehörige Maschine
 ```bash
 uv sync --dev     # Abhängigkeiten installieren (venv + Lockfile)
 make up           # PostgreSQL + pgAdmin starten, auf Bereitschaft warten, dann check (lint, ty, pytest)
-make dev          # API-Server mit Hot-Reload starten
+make run          # API-Server mit Hot-Reload starten
 ```
 
 Zum Herunterfahren aller Systeme:
@@ -104,11 +104,11 @@ und die Datenbank wird beim Start aus `pgadmin/servers.json` importiert. Das Ver
 `pgadmin/pgpass` (per `PGPASS_FILE` nach `/var/lib/pgadmin/.pgpass` kopiert). Der Desktop-Modus ist nur für die
 lokale Entwicklung gedacht – der Port `5050` ist im Netz erreichbar und damit ohne Anmeldung nutzbar.
 
-Damit Server-Definition und Passwort neu eingelesen werden, das pgAdmin-Konfigurations-Volume neu aufbauen
-(das Datenbank-Volume `postgres_data` bleibt dabei unberührt):
+Damit Server-Definition und Passwort neu eingelesen werden, muss das pgAdmin-Konfigurations-Volume weg.
+`make reset` entfernt **beide** Volumes (Datenbank und pgAdmin) und startet frisch:
 
 ```bash
-make db-reset-pgadmin
+make reset
 ```
 
 Bei SELinux (Fedora, `getenforce` = `Enforcing`) tragen die Bind-Mounts ein `z`-Label, sonst darf der
@@ -122,17 +122,20 @@ export DATABASE_URL="postgresql+psycopg://coffee:coffee@localhost:5432/coffee_ma
 
 ## Entwicklung
 
-Das Projekt nutzt **GNU Make** als Werkzeug-Menü – alle Targets inkl. Beschreibung zeigt `make help`. Die wichtigsten:
+Das Projekt nutzt **GNU Make** als Werkzeug-Menü – alle Befehle zeigt `make help`. Jeder Befehl fasst
+zusammengehörige Schritte zusammen:
 
-| Target | Zweck |
+| Befehl | Zweck |
 |---|---|
-| `make up` | Alle Systeme starten und testen (DB + lint/ty/pytest) |
-| `make down` | Alle Systeme ordentlich herunterfahren |
-| `make dev` | API-Server mit Hot-Reload |
-| `make check` | lint + typecheck + test |
-| `make setup` | Abhängigkeiten synchronisieren |
-
-Weitere Ziele (z. B. `db-psql`, `db-logs`, `format`) stehen im [Makefile](./Makefile).
+| `make setup` | Abhängigkeiten installieren und Compose-Datei prüfen |
+| `make up` | Container starten, auf PostgreSQL warten, Qualitätsgate ausführen |
+| `make run` | Datenbank sicherstellen und API-Server mit Hot-Reload starten |
+| `make logs` | Requests und Fehler der laufenden API verfolgen |
+| `make check` | Format, Lint, Typecheck und Tests prüfen (ändert nichts) |
+| `make fix` | Code formatieren und behebbare Lint-Fehler korrigieren |
+| `make down` | Container stoppen (Daten bleiben erhalten) |
+| `make reset` | Container und Volumes verwerfen, danach frisch starten |
+| `make help` | Übersicht der Befehle |
 
 ## Checkliste
 
@@ -175,9 +178,12 @@ Weitere Ziele (z. B. `db-psql`, `db-logs`, `format`) stehen im [Makefile](./Make
 
 ## Tests
 
-Die Integrationstests laufen gegen eine eigene Datenbank `coffee_machine_test`. Sie wird von der Fixture in `tests/conftest.py` automatisch angelegt; die Tabellen werden vor jedem Test geleert. Abweichender Zugang lässt sich über `TEST_DATABASE_URL` setzen:
+Die Integrationstests laufen gegen eine temporäre Datenbank `coffee_machine_test`. Die Fixture in
+`tests/conftest.py` legt sie vor dem Lauf an und löscht sie danach wieder (`DROP DATABASE ... WITH (FORCE)`).
+Dauerhaft existiert also nur `coffee_machine`. Die Tabellen werden vor jedem Test geleert. Abweichender Zugang
+lässt sich über `TEST_DATABASE_URL` setzen – der Name der Wegwerf-Datenbank wird daraus abgeleitet:
 
 ```bash
 uv run pytest          # gesamte Suite
-make check             # lint + typecheck + test
+make check             # Format + Lint + Typecheck + Test
 ```

@@ -1,13 +1,13 @@
 from collections.abc import Iterator
+from importlib import import_module
 
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.base import Base
 from app.config import Settings
 
-
-class Base(DeclarativeBase):
-    pass
+__all__ = ["Base", "Database", "database", "get_session"]
 
 
 class Database:
@@ -18,6 +18,7 @@ class Database:
         )
 
     def create_schema(self) -> None:
+        import_module("app.models")
         Base.metadata.create_all(self.engine)
 
     def dispose(self) -> None:
