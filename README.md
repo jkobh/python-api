@@ -96,8 +96,23 @@ Nach dem Start:
 | Komponente | URL / Zugang |
 |---|---|
 | API (Swagger UI) | <http://localhost:8000/docs> |
-| pgAdmin (DB-Browser) | <http://localhost:5050> – E-Mail `coffee@example.com`, Passwort `coffee` |
+| pgAdmin (DB-Browser) | <http://localhost:5050> – kein Login, Server `coffee_machine` ist vorregistriert |
 | PostgreSQL | `localhost:5432` – User `coffee`, Passwort `coffee`, DB `coffee_machine` |
+
+pgAdmin läuft im **Desktop-Modus** (`PGADMIN_CONFIG_SERVER_MODE=False`): kein Login, kein Master-Passwort,
+und die Datenbank wird beim Start aus `pgadmin/servers.json` importiert. Das Verbindungspasswort liefert
+`pgadmin/pgpass` (per `PGPASS_FILE` nach `/var/lib/pgadmin/.pgpass` kopiert). Der Desktop-Modus ist nur für die
+lokale Entwicklung gedacht – der Port `5050` ist im Netz erreichbar und damit ohne Anmeldung nutzbar.
+
+Damit Server-Definition und Passwort neu eingelesen werden, das pgAdmin-Konfigurations-Volume neu aufbauen
+(das Datenbank-Volume `postgres_data` bleibt dabei unberührt):
+
+```bash
+make db-reset-pgadmin
+```
+
+Bei SELinux (Fedora, `getenforce` = `Enforcing`) tragen die Bind-Mounts ein `z`-Label, sonst darf der
+Container die Dateien nicht lesen.
 
 Die DB-Verbindung wird über die Umgebungsvariable `DATABASE_URL` konfiguriert:
 

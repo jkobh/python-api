@@ -7,9 +7,10 @@ COMPOSE := docker compose
 APP_MODULE := app.main:app
 LOG_DIR := logs
 LOG_FILE := $(LOG_DIR)/api.log
+PGADMIN_VOLUME := $(shell $(COMPOSE) config --format json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['name'] + '_pgadmin_data')" 2>/dev/null || echo python_pgadmin_data)
 RELEVANT_LOG_LINES := '"(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS) |ERROR|CRITICAL|Traceback|Uvicorn running|Application startup|WatchFiles'
 
-.PHONY: help setup up down wait-db dev logs db-up db-down db-down-clean db-logs db-validate db-psql lint format typecheck test check clean
+.PHONY: help setup up down wait-db dev logs db-up db-down db-down-clean db-reset-pgadmin db-logs db-validate db-psql lint format typecheck test check clean
 
 help: ## Zeigt alle verfügbaren Targets
 	@echo "Verfügbare Targets:"
@@ -54,6 +55,11 @@ db-down: ## Stoppt die Datenbank-Container (Daten im Volume bleiben erhalten)
 
 db-down-clean: ## Stoppt Container und entfernt das Daten-Volume
 	$(COMPOSE) down -v
+
+db-reset-pgadmin: ## Baut nur das pgAdmin-Config-Volume neu auf (DB bleibt erhalten)
+	-$(COMPOSE) rm -sf pgadmin
+	-docker volume rm $(PGADMIN_VOLUME)
+	$(COMPOSE) up -d pgadmin
 
 db-logs: ## Zeigt die Container-Logs
 	$(COMPOSE) logs -f
