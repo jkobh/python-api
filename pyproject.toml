@@ -1,10 +1,10 @@
 [project]
 name = "coffee-machine-api"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = ">=3.15"
 dependencies = [
     "fastapi>=0.143.0",
-    "psycopg>=3.3.6",
+    "psycopg[binary]>=3.3.6",
     "pydantic>=2.14.1",
     "sqlalchemy>=2.1.4",
     "uvicorn[standard]>=0.54.0",
@@ -12,6 +12,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
     "ty>=0.0.86",
@@ -22,7 +23,7 @@ dev = [
 package = false
 
 [tool.ruff]
-target-version = "py314"
+target-version = "py315"
 line-length = 100
 src = ["."]
 
@@ -38,5 +39,16 @@ combine-as-imports = true
 # Alle ty-Regeln als Fehler melden (0.0.86, Beta)
 rules = { all = "error" }
 
+# SQLAlchemy liefert für mapped_column() den Typ MappedColumn[Any] zurück, der
+# strukturell zu Mapped[T] passt, aber kein Subtyp davon ist. Die Annotation
+# Mapped[...] bleibt fachlich korrekt, darum ist die Regel hier stummgeschaltet.
+[[tool.ty.overrides]]
+include = ["app/models.py"]
+
+[tool.ty.overrides.rules]
+unsound-assignment = "ignore"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
