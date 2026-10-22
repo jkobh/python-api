@@ -5,8 +5,11 @@
 UV     := uv
 COMPOSE := docker compose
 APP_MODULE := app.main:app
+LOG_DIR := logs
+LOG_FILE := $(LOG_DIR)/api.log
+RELEVANT_LOG_LINES := '"(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS) |ERROR|CRITICAL|Traceback|Uvicorn running|Application startup|WatchFiles'
 
-.PHONY: help setup up down wait-db dev db-up db-down db-down-clean db-logs db-validate db-psql lint format typecheck test check clean
+.PHONY: help setup up down wait-db dev logs db-up db-down db-down-clean db-logs db-validate db-psql lint format typecheck test check clean
 
 help: ## Zeigt alle verfügbaren Targets
 	@echo "Verfügbare Targets:"
@@ -33,8 +36,15 @@ down: ## Fährt alle Systeme ordentlich herunter
 	$(COMPOSE) down
 	@echo "Alle Systeme wurden beendet."
 
-dev: ## Startet den API-Server mit Hot-Reload (uvicorn --reload)
-	$(UV) run uvicorn $(APP_MODULE) --reload
+dev: ## Startet den API-Server mit Hot-Reload (uvicorn --reload, Log in logs/api.log)
+	@mkdir -p $(LOG_DIR)
+	$(UV) run uvicorn $(APP_MODULE) --reload 2>&1 | tee $(LOG_FILE)
+
+logs: ## Zeigt Requests, Fehler und Startmeldungen der laufenden API (folgt der Datei)
+	@mkdir -p $(LOG_DIR)
+	@touch $(LOG_FILE)
+	@echo "Beobachte $(LOG_FILE) – Requests und Fehler (Abbruch mit Strg+C)"
+	@tail -f -n +1 $(LOG_FILE) | grep --line-buffered -E $(RELEVANT_LOG_LINES)
 
 db-up: ## Startet PostgreSQL + pgAdmin (Docker Compose)
 	$(COMPOSE) up -d
@@ -68,6 +78,6 @@ test: ## Führt die pytest-Integrationstests aus
 
 check: lint typecheck test ## Führt Lint, Typecheck und Tests aus
 
-clean: ## Entfernt Build- und Cache-Artefakte
-	rm -rf .ruff_cache .pytest_cache .ty_cache .venv
+clean: ## Entfernt Build-, Cache- und Log-Artefakte
+	rm -rf .ruff_cache .pytest_cache .ty_cache .venv $(LOG_DIR)
 	@echo "Aufgeräumt."
